@@ -603,7 +603,7 @@ namespace UCon {
          for (int i = 0; i < x.D.Length; i++) {
             dim[i] = x.D[i] * y.Value;
          }
-         return new Unit(Math.Pow(x.Multiplier * x.Value, y.Value), dim);
+         return new Unit(x.Multiplier * Math.Pow(x.Value, y.Value), dim);
       }
 
       internal static void LoadTempUnits(string ResourceFile) {

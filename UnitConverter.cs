@@ -9,8 +9,8 @@ using System.Text;
 namespace UCon {
 	public class UnitConverter {
 
-		public static TokenList<Unit> SharedUnits { get; } = new TokenList<Unit>();
-		public static TokenList<Operator> Operators { get; } = new TokenList<Operator>();
+		public static TokenList<Unit> SharedUnits { get; } = [];
+		public static TokenList<Operator> Operators { get; } = [];
 
 		protected static UnaryOperator Identity;
 		protected static UnaryOperator Negation;
@@ -21,45 +21,38 @@ namespace UCon {
 		protected static BinaryOperator Power;
 
 
-		static string[] SciNumberFormats = new string[] {" + ", " +", "+ ", "+",
-																		 " - ", " -", "- ", "-",
-																		 " " };
+		static readonly string[] _sciNumberFormats = [" + ", " +", "+ ", "+", " - ", " -", "- ", "-", " "];
 
 		public TokenList<Unit> Units { get; } = SharedUnits.Branch();
 
-		static UnitConverter sharedUnitConverter;
+		static UnitConverter _sharedUnitConverter;
 
 		public static object Calculate(string LeftSide, string RightSide = "", double? Value = null) {
 
-			if (RightSide == null) RightSide = "";
-			if (Value == null) Value = 1.0;
+			RightSide ??= "";
+			Value ??= 1.0;
 			//RightSide ??= "";
 			//Value ??= 1.0;
 
-			if (sharedUnitConverter == null) {
-				sharedUnitConverter = new UnitConverter();
-			}
-			if (Value == null) Value = 1.0;
-			Debug.WriteLine($"Leftside: {LeftSide}, Rightside {RightSide}, Value: {Value}");
-			return sharedUnitConverter.Convert(LeftSide, RightSide, Value);
+			_sharedUnitConverter ??= new UnitConverter();
+			Value ??= 1.0;
+			Debug.WriteLine($"Left side: {LeftSide}, Right side {RightSide}, Value: {Value}");
+			return _sharedUnitConverter.Convert(LeftSide, RightSide, Value);
 		}
 
 		public static Unit GetBaseUnit(string UnitExpression) {
-			if (sharedUnitConverter == null) {
-				sharedUnitConverter = new UnitConverter();
-			}
+			_sharedUnitConverter ??= new UnitConverter();
 			if (UnitExpression == null) {
 				return null;
 			}
 			else {
-				return sharedUnitConverter.BaseUnit(UnitExpression.Trim());
+				return _sharedUnitConverter.BaseUnit(UnitExpression.Trim());
 			}
 		}
 
 		public Unit BaseUnit(string Exp) {
 
-			string strippedExp;
-			bool isGauge = CheckIfPressure(Exp, out strippedExp);
+			bool isGauge = CheckIfPressure(Exp, out string strippedExp);
 
 			try {
 				RPNExpression = GenerateRPN(Tokenize(FormatExpression(Exp)));
@@ -87,9 +80,9 @@ namespace UCon {
 
 		protected static double GaugePressure { get; } = 101325.0;
 
-		private static Dictionary<string, Line> TemperatureUnits = new Dictionary<string, Line>();
+		private static readonly Dictionary<string, Line> _temperatureUnits = [];
 
-		private Unit u = new Unit(0.0, new double[] { 0, 0, 0, 0, 0, 0, 0 });
+		private Unit _unit = new(0.0, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
 		public List<Token> RPNExpression { get; private set; }
 
@@ -115,22 +108,21 @@ namespace UCon {
 							  Power,
 							  new BinaryOperator("/", 7, (x, y) => x / y, false));
 
-			List<char> list = new List<char>();
-			list.Add(Punctuation.LeftParenthesis.Symbol[0]);
-			list.Add(Punctuation.RightParenthesis.Symbol[0]);
-			list.Add(Punctuation.Space.Symbol[0]);
+			List<char> list = [ Punctuation.LeftParenthesis.Symbol[0],
+									  Punctuation.RightParenthesis.Symbol[0],
+									  Punctuation.Space.Symbol[0] ];
 
 			foreach (Operator op in Operators) {
 				if (!op.NumbersOnly) list.Add(op.Symbol[0]);
 			}
-			Delimiters = list.ToArray();
+			Delimiters = [.. list];
 
 		}
 
 		public double Convert(string LeftSide, string RightSide = "", double? Value = null) {
 
-			Unit leftSide = new Unit();
-			Unit rightSide = new Unit();
+			//Unit leftSide = new Unit();
+			//Unit rightSide = new Unit();
 			string LeftSidetrim = LeftSide.Trim();
 			string RightSidetrim = RightSide.Trim();
 
@@ -145,7 +137,7 @@ namespace UCon {
 			var version = assembly.GetName().Version;
 			Debug.Print($"====> C# Compiler Version: {version}");
 
-			StringBuilder message = new StringBuilder();
+			StringBuilder message = new();
 			if (double.TryParse(LeftSidetrim, out double _)) message.Append("To Parameter (" + LeftSidetrim + ") ");
 			if (RightSidetrim.Length > 0 && double.TryParse(RightSidetrim, out double _)) {
 				if (message.Length > 0) message.Append("and From Parameter (" + RightSidetrim + ") are ");
@@ -158,12 +150,12 @@ namespace UCon {
 
 			if (Value != null) {
 				leftSideGauge = CheckIfPressure(LeftSidetrim, out strippedLeftSide);
-				rightSideGauge = (RightSidetrim.Length == 0) ? false : CheckIfPressure(RightSidetrim, out strippedRightSide);
+				rightSideGauge = RightSidetrim.Length != 0 && CheckIfPressure(RightSidetrim, out strippedRightSide);
 			}
 
-			if (Value != null && TemperatureUnits.ContainsKey(LeftSidetrim) && TemperatureUnits.ContainsKey(RightSidetrim)) {
-				double T1 = TemperatureUnits[LeftSidetrim].A * (double)Value + TemperatureUnits[LeftSidetrim].B;
-				return (T1 - TemperatureUnits[RightSidetrim].B) / TemperatureUnits[RightSidetrim].A;
+			if (Value != null && _temperatureUnits.ContainsKey(LeftSidetrim) && _temperatureUnits.ContainsKey(RightSidetrim)) {
+				double T1 = _temperatureUnits[LeftSidetrim].A * (double)Value + _temperatureUnits[LeftSidetrim].B;
+				return (T1 - _temperatureUnits[RightSidetrim].B) / _temperatureUnits[RightSidetrim].A;
 			}
 
 			//Get conversion factor to SI Units for the Left Side
@@ -186,7 +178,7 @@ namespace UCon {
 					throw e;
 				}
 			}
-			leftSide = EvaluateRPN(RPNExpression);
+			Unit leftSide = EvaluateRPN(RPNExpression);
 
 			//Left Side is gauge pressure - convert to absolute pressure
 
@@ -221,7 +213,7 @@ namespace UCon {
 						throw e;
 					}
 				}
-				rightSide = EvaluateRPN(RPNExpression);
+				Unit rightSide = EvaluateRPN(RPNExpression);
 
 
 				double pressureToGauge = 0;
@@ -229,11 +221,11 @@ namespace UCon {
 					pressureToGauge = GaugePressure / rightSide.Value;
 				}
 
-				u = leftSide / rightSide;
-				foreach (double d in u.D) {
+				_unit = leftSide / rightSide;
+				foreach (double d in _unit.D) {
 					if (Math.Abs(d / 1e-6) > 1.0) throw new BaseDimensionsDontMatchException(leftSide, rightSide);
 				}
-				return (Value == null) ? u.Value : u.Value * (double)Value - pressureToGauge;
+				return (Value == null) ? _unit.Value : _unit.Value * (double)Value - pressureToGauge;
 			}
 			return (Value == null) ? leftSide.Value : leftSide.Value * (double)Value;
 		}
@@ -241,13 +233,13 @@ namespace UCon {
 		static Unit EvaluateRPN(IEnumerable<Token> RPNExpression) {
 			var stack = new Stack<Unit>(); // Contains operands
 
-			// Analyse entire expression
+			// Analyze entire expression
 			foreach (var token in RPNExpression) {
 				// if it's operand then just push it to stack
 				if (token is Unit)
 					stack.Push(token as Unit);
 				else if (token is Number) {
-					stack.Push((Number)token);
+					stack.Push(token as Number);
 				}
 				else if (token is IEvaluatable) {
 					var eval = token as IEvaluatable;
@@ -279,7 +271,7 @@ namespace UCon {
 		string FormatExpression(string Expression) {
 
 			string str = Expression.Trim();
-			StringBuilder firstEdit = new StringBuilder(str);
+			StringBuilder firstEdit = new(str);
 			firstEdit.Replace('[', '(');
 			firstEdit.Replace('{', '(');
 			firstEdit.Replace(']', ')');
@@ -287,7 +279,7 @@ namespace UCon {
 			string secondString = firstEdit.ToString();
 			Debug.Print($"In FormatExpression, after first edit, expression: {secondString}");
 
-			StringBuilder secondEdit = new StringBuilder(str.Length);
+			StringBuilder secondEdit = new(str.Length);
 			long parenthCheck = 0;
 			bool hitWhiteSpace = false;
 
@@ -397,10 +389,10 @@ namespace UCon {
 
 		IEnumerable<Token> Tokenize(string Expression) {
 			int pos = 0;
-			List<Token> infix = new List<Token>();
+			List<Token> infix = [];
 
 			while (pos < Expression.Length) {
-				StringBuilder word = new StringBuilder();
+				StringBuilder word = new();
 				word.Append(Expression[pos]);
 
 				if (word[0].Is('(', ')', ' ')) ++pos;
@@ -472,7 +464,7 @@ namespace UCon {
 						//Starts with a letter
 
 						else if (char.IsLetter(word[0]) || word[0] == '°') {
-							StringBuilder partialWord = new StringBuilder();
+							StringBuilder partialWord = new();
 							char ch = ' ';
 							while (++pos < Expression.Length) {
 								ch = Expression[pos];
@@ -542,7 +534,7 @@ namespace UCon {
 				if (char.IsDigit(Expression[pos + 1]))
 					while (++pos < length && char.IsDigit(Expression[pos])) { }
 				else {
-					foreach (string test in SciNumberFormats) {
+					foreach (string test in _sciNumberFormats) {
 						if (Expression.IndexOf(test, ++pos) == pos) {
 							pos += test.Length - 1;
 							while (++pos < length && char.IsDigit(Expression[pos])) { }
@@ -555,9 +547,9 @@ namespace UCon {
 		}
 
 		bool AddUnit(string Name, ref List<Token> infix) {
-			Unit unit = new Unit();
+			//_ = new Unit();
 			bool foundUnit = false;
-
+			Unit unit;
 			if (Units.Contains(Name)) {
 				unit = Units[Name].Copy();
 				infix.Add(unit);
@@ -613,25 +605,24 @@ namespace UCon {
 		internal static void LoadTempUnits(string ResourceFile) {
 
 			Assembly assem = Assembly.GetExecutingAssembly();
-			using (Stream stream = assem.GetManifestResourceStream("UCon.Resources." + ResourceFile)) {
-				try {
-					string line;
-					using (StreamReader rdr = new StreamReader(stream)) {
-						rdr.ReadLine();
-						while ((line = rdr.ReadLine()) != null) {
-							string TempUnit = line.Substring(0, 10).Trim();
-							string a = line.Substring(13, 19).Trim();
-							string b = line.Substring(37).Trim();
-							if (double.TryParse(a, out double A) && double.TryParse(b, out double B)) {
-								TemperatureUnits.Add(TempUnit, new Line(A, B));
-							}
-						}
+			using Stream stream = assem.GetManifestResourceStream("UCon.Resources." + ResourceFile);
+			try {
+				string line;
+				using StreamReader rdr = new(stream);
+				rdr.ReadLine();
+				while ((line = rdr.ReadLine()) != null) {
+					string TempUnit = line.Substring(0, 10).Trim();
+					string a = line.Substring(13, 19).Trim();
+					string b = line.Substring(37).Trim();
+					if (double.TryParse(a, out double A) && double.TryParse(b, out double B)) {
+						_temperatureUnits.Add(TempUnit, new Line(A, B));
 					}
 				}
-				catch {
-					Debug.WriteLine("Error occured in LoadTempUnits while reading: " + ResourceFile);
-				}
 			}
+			catch {
+				Debug.WriteLine("Error occured in LoadTempUnits while reading: " + ResourceFile);
+			}
+
 		}
 
 	} //class
